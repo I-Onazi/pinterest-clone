@@ -2,6 +2,7 @@ import { View, Text, Image, StyleSheet, Pressable } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { useRouter } from 'expo-router';
+import { useNhostClient } from '@nhost/react';
 
 interface PinData {
     image: string;
@@ -15,18 +16,58 @@ interface PinProps {
 
 export default function Pin(props: PinProps) {
     const [ratio, setRatio]=useState(1);
+    const nhost=useNhostClient();
     const router=useRouter();
     const {id, image, title} = props.pin;
+    const [imageUri, setImageUri]= useState("")
     const onLike=()=>{};
+    
+    const fetchImageUri=async()=>{
+         const result=await nhost.storage.getPresignedUrl({
+            fileId: image
+        });
+        setImageUri(result.presignedUrl?.url||"")
+        console.log("Image URI:", result.presignedUrl?.url);
+    }
+    
+    const handlePress = () => {
+        console.log("Navigating with imageUri:", imageUri);
+        console.log("Navigating with ratio:", ratio);
+        
+        // Only navigate if we have the imageUri
+        if (imageUri) {
+            router.push({ 
+                pathname: "/screens/PinScreen", 
+                params: { 
+                    id,
+                    imageUri: encodeURIComponent(imageUri), // Encode the URI
+                    title,
+                    ratio: ratio.toString()
+                } 
+            });
+        } else {
+            // Fallback to just passing the id
+            router.push({ 
+                pathname: "/screens/PinScreen", 
+                params: { id } 
+            });
+        }
+    };
+    
     useEffect(()=>{
-        if(image){
-    Image.getSize(image,(width, height)=>setRatio(width/height))
-     }
+       fetchImageUri();
     },[image])
+    
+    useEffect(()=>{
+        if(imageUri){
+            Image.getSize(imageUri,(width, height)=>setRatio(width/height))
+        }
+    },[imageUri])
+    
     return (
-        <Pressable onPress={()=>router.push({ pathname: "/screens/PinScreen", params: { id } })} style={styles.pin}>
+        <Pressable onPress={handlePress} style={styles.pin}>
             <View >
-                <Image style={[styles.image,{aspectRatio:ratio}]} source={{uri: image}}/>
+                <Image style={[styles.image,{aspectRatio:ratio}]} source={{uri: imageUri}}/>
             <Pressable onPress={onLike} style={styles.heartBtn}>
             <AntDesign name="hearto" size={16} color="black" />
             </Pressable>
@@ -35,16 +76,17 @@ export default function Pin(props: PinProps) {
         </Pressable>
     )
 }
+
 const styles=StyleSheet.create({
     pin:{
         width:"100%",
         padding:3
     },
     title:{
-        fontSize:15,//he used 16
+        fontSize:15,
         lineHeight:22,
         fontWeight:"600",
-        margin:3,//he used 5
+        margin:3,
         color:"#181818"
     },
     image:{

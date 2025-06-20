@@ -18,49 +18,87 @@ interface Pin {
 }
 
 export default function PinScreen() {
-  const {id} = useLocalSearchParams();
+  const {id, ratio: passedRatio} = useLocalSearchParams();
   const nhost = useNhostClient();
-  const [ratio, setRatio] = useState(1);
+   const [ratio, setRatio] = useState(passedRatio ? parseFloat(passedRatio as string) : 1);
   const [pin, setPin] = useState<Pin|null>(null);
-  const [loading, setLoading] = useState(true); // Add loading state
+  const [loading, setLoading] = useState(true);
+  const [imageUri, setImageUri] = useState("");
   const router = useRouter();
   
   const FetchPin = async(id: string|string[]) => {
-    setLoading(true); // Set loading to true when starting fetch
-    const response = await nhost.graphql.request(`
-      query MyQuery {
-        pins_by_pk(id: "${id}") {
-          created_at
-          id
-          image
-          title
-          user {
-            avatarUrl
-            displayName
-            id
-          }
-          user_id
-        }
-      }`);
+    setLoading(true);
     
-    if(response.error){
-      Alert.alert("Error fetching pin")
+    // Convert id to string if it's an array
+    const pinId = Array.isArray(id) ? id[0] : id;
+    
+    try {
+      const response = await nhost.graphql.request(`
+        query GetPin($id: uuid!) {
+          pins_by_pk(id: $id) {
+            created_at
+            id
+            image
+            title
+            user_id
+            user {
+              id
+              avatarUrl
+              displayName
+            }
+          }
+        }`, { id: pinId });
+      
+      if(response.error){
+        Alert.alert("Error fetching pin")
+        console.log(response.error)
+        setPin(null);
+        setLoading(false);
+        return;
+      }
+      
+      const pinData = response.data.pins_by_pk;
+      setPin(pinData);
+      
+      // Fetch image URI immediately after getting pin data
+      if (pinData?.image) {
+        const imageResult = await nhost.storage.getPresignedUrl({
+          fileId: pinData.image
+        });
+        setImageUri(imageResult.presignedUrl?.url || "");
+        console.log("Image URI:", imageResult.presignedUrl?.url);
+      }
+      
+    } catch (error) {
+      console.error("Error in FetchPin:", error);
+      Alert.alert("Error fetching pin");
       setPin(null);
-    } else{
-      setPin(response.data.pins_by_pk)
+    } finally {
+      setLoading(false);
     }
-    setLoading(false); // Set loading to false when fetch completes
   }
+
+  // const fetchImageUri = async(imageFileId: string) => {
+  //   try {
+  //     const result = await nhost.storage.getPresignedUrl({
+  //       fileId: imageFileId
+  //     });
+  //     setImageUri(result.presignedUrl?.url || "");
+  //     console.log("Image URI:", result.presignedUrl?.url);
+  //   } catch (error) {
+  //     console.error("Error fetching image URI:", error);
+  //   }
+  // }
   
   useEffect(() => {
     FetchPin(id)
   }, [id])
   
   useEffect(() => {
-    if(pin?.image){
-      Image.getSize(pin.image, (width, height) => setRatio(width/height))
+    if(imageUri && !passedRatio){
+      Image.getSize(imageUri, (width, height) => setRatio(width/height))
     }
-  }, [pin])
+  }, [imageUri, passedRatio])
 
   // Show loading spinner while fetching
   if (loading) {
@@ -86,8 +124,10 @@ export default function PinScreen() {
   return (
     <View style={styles.root}>
       <View style={{height:"100%", backgroundColor:"white", borderTopLeftRadius:15, borderTopRightRadius:15}}>
-        <Image source={{uri:pin.image}} style={[styles.image, {aspectRatio:ratio}]}/>
-        <Text style={styles.title}>{pin.title}</Text>
+        {imageUri ? (
+          <Image source={{uri: imageUri}} style={[styles.image, {aspectRatio:ratio}]}/>
+        ) : null}
+        <Text style={styles.title}>{pin.title || ''}</Text>
       </View>
       <Pressable onPress={() => router.back()} style={styles.backBtn}>
         <Ionicons name={'chevron-back'} size={35} color={"black"} />

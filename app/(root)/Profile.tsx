@@ -1,15 +1,34 @@
-import { View, Text, StyleSheet, Image, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, Image, ScrollView, Pressable } from 'react-native'
 import React from 'react'
 import MasonryList from '@/components/MasonryList'
 import pins from '@/assets/data/pins'
 import {Entypo, Feather} from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
+
 
 export default function Profile() {
+   const { signOut, user, isAuthenticated } = useAuth();
+
+
+    console.log('Profile - User:', user?.email, 'IsAuth:', isAuthenticated);
+
+    const handleSignOut = async () => {
+        console.log('Before sign out - IsAuth:', isAuthenticated);
+        try {
+            await signOut();
+            
+            console.log('After sign out - should redirect automatically');
+        } catch (error) {
+            console.error('Sign out failed:', error);
+        }
+    };
   return (
     <ScrollView style={styles.container} >
        <View style={styles.header}>
         <View style={styles.icons}>
-        <Feather name="share" size={24} color="black" style={styles.icon}/>
+        <Pressable onPress={handleSignOut}>
+            <Feather name="share" size={24} color="black" style={styles.icon} />
+        </Pressable>
         <Entypo name="dots-three-horizontal" size={24} color="black" style={styles.icon}/>
         </View>
          <Image source={{uri:"https://notjustdev-dummy.s3.us-east-2.amazonaws.com/pinterest/2.jpeg"}} style={styles.image}/>

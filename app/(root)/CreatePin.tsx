@@ -1,12 +1,66 @@
 import { useEffect, useState } from 'react';
-import { Button, Image, View, StyleSheet, TextInput, ScrollView } from 'react-native';
+import { Button, Image, View, StyleSheet, TextInput, ScrollView, Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useNhostClient } from '@nhost/react';
+import { useRouter } from 'expo-router';
 
+const CREATE_PIN_MUTATION=`mutation MyMutation($image:String!, $title:String) {
+  insert_pins(objects: {image: $image, title: $title}) {
+    returning {
+      created_at
+      id
+      image
+      title
+      user_id
+    }
+  }
+}`
 export default function CreatePin() {
   const [image, setImage] = useState<string | null>(null);
   const [title, setTitle]=useState("")
-  const onSubmit=()=>{
-    
+  const router = useRouter();
+  const nhost = useNhostClient();
+
+  const uploadFile = async () => {
+    if(!image){
+      return{
+        error: {
+          message:"No image selected"}
+      }
+    }
+    const parts=image.split("/");
+    const name=parts[parts.length-1];
+    const namePs=name.split(".")
+    const extension=namePs[namePs.length-1];
+  const uri=Platform.OS==="ios"?image?.replace("file://", ""):image;
+
+    const result=await nhost.storage.upload({
+      file:{
+        name,
+        type:`image/${extension}`,
+        uri,
+      },
+    });
+    return result;
+  }
+  
+  const onSubmit=async()=>{
+    const uploadResult = await uploadFile();
+    if(uploadResult.error){
+      Alert.alert("Error uploading image", uploadResult.error.message);
+      return;
+    }
+    const result=await nhost.graphql.request(CREATE_PIN_MUTATION,{
+      title,
+      image: uploadResult.fileMetadata?.id
+    });
+    console.log(result);
+    if(result.error){
+      Alert.alert("Error creating pin");
+    }
+    else{
+      router.back();
+    }
   }
 
   const pickImage = async () => {

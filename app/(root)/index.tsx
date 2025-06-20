@@ -5,10 +5,11 @@ import { useNhostClient } from '@nhost/react'
 import { Alert } from 'react-native';
 
 
-
 export default function Index() {
 
   const nhost=useNhostClient();
+ const [refreshing, setRefreshing] = useState(false);
+
   const [pins, setPins] = useState([]);
   const FetchPins=async()=>{
     const response = await nhost.graphql.request(`
@@ -30,12 +31,18 @@ export default function Index() {
     }
     console.log(response)
   }
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await FetchPins();
+    setRefreshing(false);
+  };
 
   useEffect(()=>{
     FetchPins();
   },[])
   return (
-    <MasonryList pins={pins}/>
+    <MasonryList pins={pins} onRefresh={handleRefresh}
+        refreshing={refreshing}/>
   )
 }
 
