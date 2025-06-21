@@ -80,7 +80,7 @@ const SignUpScreen = () => {
           </Text>
         </Text>
 
-        <SocialSignInButtons />
+        {/* <SocialSignInButtons /> */}
 
         <CustomButton
           text="Have an account? Sign in"
